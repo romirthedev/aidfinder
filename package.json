@@ -1,0 +1,11 @@
+{
+  "name": "aidfinder",
+  "version": "1.0.0",
+  "description": "A futuristic aid locator app",
+  "dependencies": {
+    "node-fetch": "^2.6.12"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
