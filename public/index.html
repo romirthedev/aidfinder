@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AidFinder</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0a0a23;
+            font-family: 'Courier New', monospace;
+            overflow-x: hidden;
+        }
+        .holo-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            animation: fadeIn 1s ease-in;
+        }
+        .holo-title {
+            color: #00ffcc;
+            text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc, 0 0 40px #00ffcc;
+            font-size: 3em;
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+        .input-panel, .filter-panel, .submit-panel {
+            background: rgba(0, 255, 204, 0.1);
+            border: 1px solid #00ffcc;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            box-shadow: 0 0 15px #00ffcc;
+            backdrop-filter: blur(5px);
+        }
+        input[type="text"] {
+            background: transparent;
+            border: 1px solid #00ffcc;
+            color: #fff;
+            padding: 8px;
+            margin: 5px;
+            border-radius: 3px;
+            outline: none;
+            transition: box-shadow 0.3s;
+        }
+        input[type="text"]:focus {
+            box-shadow: 0 0 10px #00ffcc;
+        }
+        .holo-btn {
+            background: linear-gradient(45deg, #00ffcc, #00ccff);
+            border: none;
+            padding: 10px 20px;
+            color: #0a0a23;
+            font-weight: bold;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .holo-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #00ffcc;
+        }
+        .holo-checkbox {
+            color: #00ffcc;
+            margin: 0 10px;
+            text-shadow: 0 0 5px #00ffcc;
+        }
+        .holo-map {
+            height: 400px;
+            width: 100%;
+            border: 2px solid #00ffcc;
+            box-shadow: 0 0 20px #00ffcc;
+            transform: perspective(1000px) rotateX(10deg);
+            transition: transform 0.5s;
+        }
+        .holo-map:hover {
+            transform: perspective(1000px) rotateX(0deg);
+        }
+        .resource-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(0, 255, 204, 0.1);
+            border: 1px solid #00ffcc;
+            padding: 10px;
+            margin-top: 10px;
+            color: #fff;
+            text-shadow: 0 0 5px #00ffcc;
+        }
+        .resource-list div {
+            padding: 10px;
+            border-bottom: 1px solid #00ffcc;
+            transition: background 0.3s;
+        }
+        .resource-list div:hover {
+            background: rgba(0, 255, 204, 0.2);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes pulse {
+            0% { text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc; }
+            50% { text-shadow: 0 0 20px #00ffcc, 0 0 40px #00ffcc; }
+            100% { text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc; }
+        }
+    </style>
+</head>
+<body>
+    <div class="holo-container">
+        <h1 class="holo-title">AidFinder</h1>
+        <div class="input-panel">
+            <input type="text" id="locationInput" placeholder="Enter city or ZIP">
+            <button id="searchBtn" class="holo-btn">Scan</button>
+            <button id="geoBtn" class="holo-btn">Use My Location</button>
+        </div>
+        <div class="filter-panel">
+            <label class="holo-checkbox">
+                <input type="checkbox" name="filter" value="food"> Food
+            </label>
+            <label class="holo-checkbox">
+                <input type="checkbox" name="filter" value="medical"> Medical
+            </label>
+            <label class="holo-checkbox">
+                <input type="checkbox" name="filter" value="shelter"> Shelter
+            </label>
+        </div>
+        <div id="map" class="holo-map"></div>
+        <div id="resourceList" class="resource-list"></div>
+        <div class="submit-panel">
+            <input type="text" id="submitName" placeholder="Aid Name">
+            <input type="text" id="submitLat" placeholder="Latitude">
+            <input type="text" id="submitLon" placeholder="Longitude">
+            <input type="text" id="submitType" placeholder="Type (food/medical/shelter)">
+            <button id="submitBtn" class="holo-btn">Submit Aid</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/fuse.js/dist/fuse.min.js"></script>
+    <script>
+        fetch('/resources.json')
+            .then(res => res.json())
+            .then(data => initApp(data))
+            .catch(err => console.error('Error loading resources:', err));
+
+        function initApp(aidData) {
+            const map = L.map('map').setView([40.7128, -74.0060], 4);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            let markers = [];
+            function updateMap(data) {
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
+                data.forEach(resource => {
+                    const marker = L.marker([resource.lat, resource.lon]).addTo(map)
+                        .bindPopup(`${resource.name} (${resource.type})`);
+                    markers.push(marker);
+                });
+            }
+
+            updateMap(aidData);
+
+            function getDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371;
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                          Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            }
+
+            const fuse = new Fuse(aidData, { keys: ['name'], threshold: 0.3 });
+            function filterResources(lat, lon, filters) {
+                let filtered = aidData;
+                if (filters.length > 0) {
+                    filtered = filtered.filter(r => filters.includes(r.type));
+                }
+                if (lat && lon) {
+                    filtered = filtered.map(r => ({
+                        ...r,
+                        distance: getDistance(lat, lon, r.lat, r.lon)
+                    })).sort((a, b) => a.distance - b.distance);
+                }
+                updateMap(filtered);
+                const list = document.getElementById('resourceList');
+                list.innerHTML = filtered.map(r => 
+                    `<div>${r.name} (${r.type}) - ${r.distance ? r.distance.toFixed(2) + 'km' : 'N/A'} - Updated: ${r.updated}</div>`
+                ).join('');
+            }
+
+            document.getElementById('searchBtn').addEventListener('click', () => {
+                const query = document.getElementById('locationInput').value;
+                const filters = Array.from(document.querySelectorAll('input[name="filter"]:checked')).map(cb => cb.value);
+                fetch(`/api/geocode?query=${encodeURIComponent(query)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.lat && data.lon) {
+                            filterResources(data.lat, data.lon, filters);
+                            map.setView([data.lat, data.lon], 10);
+                        } else {
+                            alert('Location not found');
+                        }
+                    })
+                    .catch(() => alert('Geocoding failed'));
+            });
+
+            document.getElementById('geoBtn').addEventListener('click', () => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        const filters = Array.from(document.querySelectorAll('input[name="filter"]:checked')).map(cb => cb.value);
+                        filterResources(pos.coords.latitude, pos.coords.longitude, filters);
+                        map.setView([pos.coords.latitude, pos.coords.longitude], 10);
+                    }, () => alert('Geolocation failed'));
+                } else {
+                    alert('Geolocation not supported');
+                }
+            });
+
+            document.getElementById('submitBtn').addEventListener('click', () => {
+                const name = document.getElementById('submitName').value;
+                const lat = parseFloat(document.getElementById('submitLat').value);
+                const lon = parseFloat(document.getElementById('submitLon').value);
+                const type = document.getElementById('submitType').value;
+                if (name && !isNaN(lat) && !isNaN(lon) && type) {
+                    const newAid = { name, lat, lon, type, updated: new Date().toISOString().split('T')[0] };
+                    aidData.push(newAid);
+                    filterResources(null, null, []);
+                    alert('Aid submitted! (Stored locally for this session)');
+                } else {
+                    alert('Please fill all fields correctly');
+                }
+            });
+
+            document.querySelectorAll('input[name="filter"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const filters = Array.from(document.querySelectorAll('input[name="filter"]:checked')).map(cb => cb.value);
+                    filterResources(null, null, filters);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
