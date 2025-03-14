@@ -1,0 +1,5 @@
+[
+    { "name": "NYC Food Bank", "lat": 40.7128, "lon": -74.0060, "type": "food", "updated": "2025-03-10" },
+    { "name": "LA Shelter", "lat": 34.0522, "lon": -118.2437, "type": "shelter", "updated": "2025-03-11" },
+    { "name": "Chicago Clinic", "lat": 41.8781, "lon": -87.6298, "type": "medical", "updated": "2025-03-12" }
+]
